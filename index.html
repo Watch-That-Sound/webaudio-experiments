@@ -2,11 +2,103 @@
   <head>
     <title>Watch That Sound Experiments</title>
     <script type="text/javascript">
+      async function makeRecorder(targetAudio) {
+        const audioSettings = {
+          echoCancellation: false,
+          autoGainControl: false,
+          noiseSuppression: false,
+        };
+        if (window.inputDevice) {
+          audioSettings.deviceId = { exact: window.inputDevice.deviceId };
+        }
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: audioSettings,
+        });
+
+        const recorder = new MediaRecorder(stream);
+
+        const onRecordingReady = (e) => {
+          targetAudio.src = URL.createObjectURL(e.data);
+        };
+        // listen to dataavailable, which gets triggered whenever we have
+        // an audio blob available
+        recorder.addEventListener("dataavailable", onRecordingReady);
+        return recorder;
+      }
+
+      function setupRecorders() {
+        let recorders = document.querySelectorAll(".recorder_container");
+        if (!recorders.length) {
+          return;
+        }
+        let audiostream;
+        let recorder;
+        let activeAudio;
+
+        recorders.forEach((rec) => {
+          let start = rec.querySelector(".recorder_start");
+          let stop = rec.querySelector(".recorder_stop");
+          let play = rec.querySelector(".recorder_play");
+          let playstop = rec.querySelector(".recorder_playstop");
+          let reset = rec.querySelector(".recorder_reset");
+          let audio = rec.querySelector(".recorder_audio");
+          start.addEventListener("click", async () => {
+            start.disabled = true;
+            stop.disabled = false;
+            activeAudio = audio;
+            recorder = await makeRecorder(audio);
+            recorder.start();
+          });
+          stop.addEventListener("click", () => {
+            stop.disabled = true;
+            recorder.stop();
+            play.disabled = false;
+            reset.disabled = false;
+          });
+          play.addEventListener("click", () => {
+            if (window.outputDevice) {
+              audio.setSinkId(window.outputDevice.deviceId);
+            }
+            audio.play();
+            play.disabled = true;
+            playstop.disabled = false;
+          });
+          playstop.addEventListener("click", () => {
+            audio.pause();
+            audio.currentTime = 0;
+            play.disabled = false;
+            playstop.disabled = true;
+          });
+          reset.addEventListener("click", () => {
+            play.disabled = true;
+            reset.disabled = true;
+            start.disabled = false;
+            playstop.disabled = true;
+          });
+          audio.addEventListener("ended", () => {
+            play.disabled = false;
+            playstop.disabled = true;
+          });
+        });
+      }
+
+      window.addEventListener("DOMContentLoaded", function () {
+        setupRecorders();
+      });
       
     </script>
   </head>
   <body>
     <h1>Experiment: Recording Delay</h1>
     <p>What is the delay when recording audio in browser?</p>
+    <div class="recorder_container">
+    <button class="recorder_start">Start</button>
+    <button class="recorder_stop" disabled>Stop</button>
+    <audio class="recorder_audio" ></audio>
+    <button class="recorder_play" disabled></button>
+    <button class="recorder_playstop" disabled></button>
+    <button class="recorder_reset" disabled></button>
+</div>
+
   </body>
 </html>
