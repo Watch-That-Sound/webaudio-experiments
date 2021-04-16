@@ -2,6 +2,7 @@
   <head>
     <title>Watch That Sound Experiments</title>
     <script type="text/javascript">
+      
       async function makeRecorder(targetAudio) {
         const audioSettings = {
           echoCancellation: false,
@@ -25,33 +26,34 @@
         recorder.addEventListener("dataavailable", onRecordingReady);
         return recorder;
       }
-
+  
+      const recorders = [];
       function setupRecorders() {
-        let recorders = document.querySelectorAll(".recorder_container");
-        if (!recorders.length) {
+        let recorderContainers = document.querySelectorAll(".recorder_container");
+        if (!recorderContainers.length) {
           return;
         }
-        let audiostream;
-        let recorder;
-        let activeAudio;
 
-        recorders.forEach((rec) => {
+        recorderContainers.forEach((rec) => {
           let start = rec.querySelector(".recorder_start");
           let stop = rec.querySelector(".recorder_stop");
           let play = rec.querySelector(".recorder_play");
           let playstop = rec.querySelector(".recorder_playstop");
           let reset = rec.querySelector(".recorder_reset");
           let audio = rec.querySelector(".recorder_audio");
+          const recplay = { audio };
+          recorders.push(recplay);
+          
           start.addEventListener("click", async () => {
             start.disabled = true;
             stop.disabled = false;
             activeAudio = audio;
-            recorder = await makeRecorder(audio);
-            recorder.start();
+            recplay.recorder = await makeRecorder(audio);
+            recplay.recorder.start();
           });
           stop.addEventListener("click", () => {
             stop.disabled = true;
-            recorder.stop();
+            recplay.recorder.stop();
             play.disabled = false;
             reset.disabled = false;
           });
@@ -84,21 +86,38 @@
 
       window.addEventListener("DOMContentLoaded", function () {
         setupRecorders();
+        document.getElementById("playrecord").addEventListener("click", () => {
+          recorders[0].audio.play();
+          recorders[1].recorder.record();
+        });
       });
       
     </script>
   </head>
   <body>
     <h1>Experiment: Recording Delay</h1>
-    <p>What is the delay when recording audio in browser?</p>
+    <p>What is the delay when recording audio in browser? First record something in Recorder A.
+      (tip: reset after first recording because mic permission delay)</p>
     <div class="recorder_container">
-    <button class="recorder_start">Start recording</button>
-    <button class="recorder_stop" disabled>Stop recording</button>
-    <audio class="recorder_audio" controls></audio>
-    <button class="recorder_play" disabled>Play</button>
-    <button class="recorder_playstop" disabled>Stop</button>
-    <button class="recorder_reset" disabled>Reset</button>
-</div>
+      <h2>Recorder A</h2>
+      <button class="recorder_start">Start recording</button>
+      <button class="recorder_stop" disabled>Stop recording</button>
+      <audio class="recorder_audio" controls></audio>
+      <button class="recorder_play" disabled>Play</button>
+      <button class="recorder_playstop" disabled>Stop</button>
+      <button class="recorder_reset" disabled>Reset</button>
+    </div>
+    <p>Now: use <button id="playArecordB">Play A + Record B</button> to start playing A and recording into B.</p>
+    <div class="recorder_container">
+      <h2>Recorder B</h2>
+      <button class="recorder_start">Start recording</button>
+      <button class="recorder_stop" disabled>Stop recording</button>
+      <audio class="recorder_audio" controls></audio>
+      <button class="recorder_play" disabled>Play</button>
+      <button class="recorder_playstop" disabled>Stop</button>
+      <button class="recorder_reset" disabled>Reset</button>
+  </div>
 
+    
   </body>
 </html>
