@@ -2,8 +2,7 @@
   <head>
     <title>Watch That Sound Experiments</title>
     <script type="text/javascript">
-      
-      async function makeRecorder(targetAudio) {
+      async function makeRecorder(targetAudio, targetLink) {
         const audioSettings = {
           echoCancellation: false,
           autoGainControl: false,
@@ -20,16 +19,19 @@
 
         const onRecordingReady = (e) => {
           targetAudio.src = URL.createObjectURL(e.data);
+          targetLink.href = targetAudio.src;
         };
         // listen to dataavailable, which gets triggered whenever we have
         // an audio blob available
         recorder.addEventListener("dataavailable", onRecordingReady);
         return recorder;
       }
-  
+
       const recorders = [];
       function setupRecorders() {
-        let recorderContainers = document.querySelectorAll(".recorder_container");
+        let recorderContainers = document.querySelectorAll(
+          ".recorder_container"
+        );
         if (!recorderContainers.length) {
           return;
         }
@@ -41,22 +43,28 @@
           let playstop = rec.querySelector(".recorder_playstop");
           let reset = rec.querySelector(".recorder_reset");
           let audio = rec.querySelector(".recorder_audio");
+          let download = rec.querySelector(".recorder_download");
           const recplay = { audio };
           recorders.push(recplay);
-          recplay.recorder = await makeRecorder(audio);
+          recplay.recorder = await makeRecorder(audio, download);
 
-          start.addEventListener("click", async () => {
+          download.style.display = "none";
+          recplay.startRecording = () => {
             start.disabled = true;
             stop.disabled = false;
-            activeAudio = audio;
             recplay.recorder.start();
-          });
-          stop.addEventListener("click", () => {
+            download.style.display = "none";
+          };
+          recplay.stopRecording = () => {
             stop.disabled = true;
             recplay.recorder.stop();
             play.disabled = false;
             reset.disabled = false;
-          });
+            download.style.display = "";
+          };
+
+          start.addEventListener("click", recplay.startRecording);
+          stop.addEventListener("click", recplay.stopRecording);
           play.addEventListener("click", () => {
             if (window.outputDevice) {
               audio.setSinkId(window.outputDevice.deviceId);
@@ -71,12 +79,12 @@
             play.disabled = false;
             playstop.disabled = true;
           });
-          reset.addEventListener("click", async  () => {
+          reset.addEventListener("click", async () => {
             play.disabled = true;
             reset.disabled = true;
             start.disabled = false;
             playstop.disabled = true;
-            recplay.recorder = await makeRecorder(audio);
+            recplay.recorder = await makeRecorder(audio, download);
           });
           audio.addEventListener("ended", () => {
             play.disabled = false;
@@ -87,38 +95,59 @@
 
       window.addEventListener("DOMContentLoaded", function () {
         setupRecorders();
-        document.getElementById("playArecordB").addEventListener("click", () => {
+        document
+          .getElementById("playArecordB")
+          .addEventListener("click", () => {
+            recorders[0].audio.addEventListener("ended", () => {
+              recorders[1].stopRecording();
+            });
+            recorders[0].audio.play();
+            recorders[1].startRecording();
+          });
+        document.getElementById("playAplayB").addEventListener("click", () => {
           recorders[0].audio.play();
-          recorders[1].recorder.record();
+          recorders[1].audio.play();
         });
       });
-      
     </script>
   </head>
   <body>
     <h1>Experiment: Recording Delay</h1>
-    <p>What is the delay when recording audio in browser? First record something in Recorder A.
-      (tip: reset after first recording because mic permission delay)</p>
-    <div class="recorder_container">
+    <p>
+      What is the delay when recording audio in browser? <br />
+      <strong>Step 1</strong>: record something in Recorder A. (tip: reset after
+      first recording because mic permission delay)
+    </p>
+    <div class="recorder_container" id="recorder_A">
       <h2>Recorder A</h2>
-      <button class="recorder_start">Start recording</button>
-      <button class="recorder_stop" disabled>Stop recording</button>
+      <button class="recorder_start">start recording</button>
+      <button class="recorder_stop" disabled>stop recording</button>
       <audio class="recorder_audio" controls></audio>
-      <button class="recorder_play" disabled>Play</button>
-      <button class="recorder_playstop" disabled>Stop</button>
-      <button class="recorder_reset" disabled>Reset</button>
+      <button class="recorder_play" disabled>play</button>
+      <button class="recorder_playstop" disabled>stop</button>
+      <button class="recorder_reset" disabled>reset</button>
+      <a class="recorder_download" href="#" download="sampleA.wav">download</a>
     </div>
-    <p>Now: use <button id="playArecordB">Play A + Record B</button> to start playing A and recording into B.</p>
-    <div class="recorder_container">
+    <p>
+      <strong>Step 2</strong>: use
+      <button id="playArecordB">Play A + Record B</button> to start playing A
+      and recording into B at the same time. B records from the default input,
+      so make sure it can 'hear' the speakers.
+    </p>
+    <div class="recorder_container" id="recorder_B">
       <h2>Recorder B</h2>
-      <button class="recorder_start">Start recording</button>
-      <button class="recorder_stop" disabled>Stop recording</button>
+      <button class="recorder_start">start recording</button>
+      <button class="recorder_stop" disabled>stop recording</button>
       <audio class="recorder_audio" controls></audio>
-      <button class="recorder_play" disabled>Play</button>
-      <button class="recorder_playstop" disabled>Stop</button>
-      <button class="recorder_reset" disabled>Reset</button>
-  </div>
-
-    
+      <button class="recorder_play" disabled>play</button>
+      <button class="recorder_playstop" disabled>stop</button>
+      <button class="recorder_reset" disabled>reset</button>
+      <a class="recorder_download" href="#" download="sampleB.wav">download</a>
+    </div>
+    <p>
+      <strong>Step 3</strong>:
+      <button id="playAplayB">play both</button> samples at the same time, for
+      proper comparison download them both and analyse in for example Audacity.
+    </p>
   </body>
 </html>
