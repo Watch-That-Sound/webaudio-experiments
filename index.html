@@ -34,7 +34,7 @@
           return;
         }
 
-        recorderContainers.forEach((rec) => {
+        recorderContainers.forEach(async (rec) => {
           let start = rec.querySelector(".recorder_start");
           let stop = rec.querySelector(".recorder_stop");
           let play = rec.querySelector(".recorder_play");
@@ -43,12 +43,12 @@
           let audio = rec.querySelector(".recorder_audio");
           const recplay = { audio };
           recorders.push(recplay);
-          
+          recplay.recorder = await makeRecorder(audio);
+
           start.addEventListener("click", async () => {
             start.disabled = true;
             stop.disabled = false;
             activeAudio = audio;
-            recplay.recorder = await makeRecorder(audio);
             recplay.recorder.start();
           });
           stop.addEventListener("click", () => {
@@ -71,11 +71,12 @@
             play.disabled = false;
             playstop.disabled = true;
           });
-          reset.addEventListener("click", () => {
+          reset.addEventListener("click", async  () => {
             play.disabled = true;
             reset.disabled = true;
             start.disabled = false;
             playstop.disabled = true;
+            recplay.recorder = await makeRecorder(audio);
           });
           audio.addEventListener("ended", () => {
             play.disabled = false;
