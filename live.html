@@ -1,0 +1,234 @@
+<html>
+  <head>
+    <title>Watch That Sound Experiments - Live Loopback Delay</title>
+    <script type="text/javascript">
+      let audioCtx;
+      let analyser;
+      let sine;
+      let gain;
+
+      let drawFrameId;
+      let dataArray;
+      let dataBufferLength;
+      let canvasCtx;
+      let WIDTH;
+      let HEIGHT;
+      let targetFrequencyBin;
+      const CUTOFF = 180;
+      const FFTSIZE = 128;
+
+      async function setup() {
+        audioCtx = new (AudioContext || webkitAudioContext)();
+        canvasCtx = document.getElementById("canvas").getContext("2d");
+        WIDTH = document.getElementById("canvas").width;
+        HEIGHT = document.getElementById("canvas").height;
+
+        const audioSettings = {
+          echoCancellation: false,
+          autoGainControl: false,
+          noiseSuppression: false,
+        };
+        if (window.inputDevice) {
+          audioSettings.deviceId = { exact: window.inputDevice.deviceId };
+        }
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: audioSettings,
+        });
+
+        sine = audioCtx.createOscillator();
+        gain = audioCtx.createGain();
+
+        sine.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        (sine.frequency.value = document.getElementById("frequency").value),
+          sine.start();
+
+        const streamSource = audioCtx.createMediaStreamSource(stream);
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = FFTSIZE;
+        analyser.smoothingTimeConstant = 0;
+        analyser.minDecibels = -60;
+        analyser.maxDecibels = -40;
+
+        dataBufferLength = analyser.frequencyBinCount;
+        dataArray = new Uint8Array(dataBufferLength);
+
+        streamSource.connect(analyser);
+
+        drawFrameId = requestAnimationFrame(draw);
+      }
+
+      function draw() {
+        drawFrameId = requestAnimationFrame(draw);
+        analyser.getByteFrequencyData(dataArray);
+        canvasCtx.fillStyle = "rgb(0, 0, 0)";
+        canvasCtx.fillRect(0, 0, WIDTH, HEIGHT);
+
+        var barWidth = (WIDTH / dataBufferLength) * 2.5;
+        var barHeight;
+        var x = 0;
+
+        var maxHeight = 0;
+        for (var i = 0; i < dataBufferLength; i++) {
+          barHeight = dataArray[i];
+
+          canvasCtx.fillStyle = "rgb(" + (barHeight + 100) + ",50,50)";
+          canvasCtx.fillRect(
+            x,
+            HEIGHT - barHeight / 2,
+            barWidth,
+            barHeight / 2
+          );
+          if (barHeight > maxHeight) {
+            maxHeight = barHeight;
+            targetFrequencyBin = i;
+          }
+
+          x += barWidth + 1;
+        }
+      }
+
+      const formatMs = (secs) => `${Math.round(secs * 100_000) / 100}ms`;
+
+      function updateFrequenceBin() {
+        setTimeout(
+          () =>
+            (document.getElementById(
+              "targetFrequencyBin"
+            ).innerText = `#${targetFrequencyBin}, which is ${
+              ((targetFrequencyBin / dataBufferLength) * audioCtx.sampleRate) /
+              2
+            } Hz`),
+          100
+        );
+      }
+
+      let detectMuteTimer;
+      let muteMeasurement = {
+        start: 0,
+        detect: 0,
+      };
+      function detectMute() {
+        analyser.getByteFrequencyData(dataArray);
+        if (dataArray[targetFrequencyBin] === 0) {
+          muteMeasurement.detect = audioCtx.currentTime;
+          clearInterval(detectMuteTimer);
+          document.getElementById("measure_mute").innerText = formatMs(
+            muteMeasurement.detect - muteMeasurement.start
+          );
+        } else {
+          // loopy
+        }
+      }
+      let detectUnmuteTimer;
+      let unmuteMeasurement = {
+        start: 0,
+        detect: 0,
+      };
+      function detectUnmute() {
+        analyser.getByteFrequencyData(dataArray);
+        if (dataArray[targetFrequencyBin] === 0) {
+          unmuteMeasurement.detect = audioCtx.currentTime;
+          clearInterval(detectUnmuteTimer);
+          document.getElementById("measure_unmute").innerText = formatMs(
+            unmuteMeasurement.detect - unmuteMeasurement.start
+          );
+        } else {
+          // loopy
+        }
+      }
+
+      function stopDrawingAnalyser() {
+        if (drawFrameId) {
+          cancelAnimationFrame(drawFrameId);
+          drawFrameId = undefined;
+        }
+        document.getElementById("ctx_latencies").innerText = `base: ${formatMs(
+          audioCtx.baseLatency
+        )} output: ${formatMs(audioCtx.outputLatency)}`;
+        canvasCtx.fillStyle = "rgb(255, 255, 255)";
+        canvasCtx.fillRect(0, 0, WIDTH, HEIGHT);
+      }
+
+      function measureAfterMute() {
+        stopDrawingAnalyser();
+        setTimeout(() => {
+          // wait a moment for the cancelAnimationFrame to surely kick in, then mute and measure
+          detectMuteTimer = setInterval(detectMute, 0);
+          gain.gain.value = 0;
+          muteMeasurement.start = audioCtx.currentTime;
+        }, 500);
+      }
+
+      function measureAfterUnmute() {
+        stopDrawingAnalyser();
+        setTimeout(() => {
+          // wait a moment for the cancelAnimationFrame to surely kick in, then mute and measure
+          detectUnmuteTimer = setInterval(detectUnmute, 0);
+          gain.gain.value = 1;
+          unmuteMeasurement.start = audioCtx.currentTime;
+        }, 500);
+      }
+
+      window.addEventListener("DOMContentLoaded", function () {
+        document
+          .getElementById("frequency")
+          .addEventListener("change", (evt) => {
+            (sine.frequency.value = evt.target.value), updateFrequenceBin();
+          });
+        document.getElementById("minDb").addEventListener("change", (evt) => {
+          analyser.minDecibels = evt.target.value;
+        });
+        document.getElementById("maxDb").addEventListener("change", (evt) => {
+          analyser.maxDecibels = evt.target.value;
+        });
+      });
+    </script>
+  </head>
+  <body>
+    <h1>Experiment 2: Live Loopback Delay</h1>
+    <p>
+      What is the delay when producing sound in WebAudio, until it is analysed?
+    </p>
+    <h2>Step 1: setup</h2>
+    <p>
+      click <button onclick="setup()">setup</button> to prepare the audio
+      context and sources etcetera.
+    </p>
+    <h2>Step 2: adjust</h2>
+    <p>
+      possibly adjust the frequency:
+      <input
+        id="frequency"
+        type="number"
+        value="200"
+        step="25"
+        min="0"
+        max="20000"
+      />, the analyser minDb
+      <input id="minDb" type="number" value="-60" min="-100" max="0" step="5" />
+      and maxDb
+      <input id="maxDb" type="number" value="-40" min="-100" max="0" step="5" />
+    </p>
+    <p>Make sure the analyser has a clear peak, the cutoff is 70%</p>
+    <canvas width="512" height="128" id="canvas"></canvas>
+    <h2>Step 3: measure</h2>
+    <p>
+      Alternate between
+      <button id="mute" onclick="measureAfterMute()">mute</button> and
+      <button id="unmute" onclick="measureAfterUnmute()">unmute</button> in
+      order to measure the time between stopping/starting the production of
+      sound and the time of detecting the sound.
+    </p>
+    <h2>Results</h2>
+    <p>
+      The targetFrequency is measured to be at index
+      <span id="targetFrequencyBin"></span>.
+      <button onclick="updateFrequenceBin()">update</button>
+    </p>
+    <p>AudioContext latencies: <span id="ctx_latencies"></span></p>
+    <p>Detect silence after mute: <span id="measure_mute"></span></p>
+    <p>Detect noise after unmute: <span id="measure_unmute"></span></p>
+  </body>
+</html>
