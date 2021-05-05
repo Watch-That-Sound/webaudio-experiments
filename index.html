@@ -2,6 +2,9 @@
   <head>
     <title>Watch That Sound Experiments</title>
     <script type="text/javascript">
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm")
+        ? "audio/webm"
+        : "audio/mp4";
       async function makeRecorder(targetAudio, targetLink) {
         const audioSettings = {
           echoCancellation: false,
@@ -15,11 +18,16 @@
           audio: audioSettings,
         });
 
-        const recorder = new MediaRecorder(stream);
+        const recorder = new MediaRecorder(stream, {
+          mimeType: mimeType,
+        });
 
         const onRecordingReady = (e) => {
           targetAudio.src = URL.createObjectURL(e.data);
           targetLink.href = targetAudio.src;
+          targetLink.download =
+            targetLink.getAttribute("data-base") +
+            (mimeType === "audio/webm" ? ".webm" : ".m4a");
         };
         // listen to dataavailable, which gets triggered whenever we have
         // an audio blob available
@@ -115,7 +123,7 @@
     <h1>Experiment: Recording Delay</h1>
     <p>
       What is the delay when recording audio in browser? This experiment uses
-      MediaRecorder API, see <a href="./live.html">loopback experiment</a> for another method.
+      MediaRecorder API
     </p>
     <p><strong>Step 1</strong>: record something in Recorder A.</p>
     <div class="recorder_container" id="recorder_A">
@@ -126,7 +134,13 @@
       <button class="recorder_play" disabled>play</button>
       <button class="recorder_playstop" disabled>stop</button>
       <button class="recorder_reset" disabled>reset</button>
-      <a class="recorder_download" href="#" download="sampleA.wav">download</a>
+      <a
+        class="recorder_download"
+        href="#"
+        data-base="sampleA"
+        download="sampleA.wav"
+        >download</a
+      >
     </div>
     <p>
       <strong>Step 2</strong>: use
@@ -142,7 +156,13 @@
       <button class="recorder_play" disabled>play</button>
       <button class="recorder_playstop" disabled>stop</button>
       <button class="recorder_reset" disabled>reset</button>
-      <a class="recorder_download" href="#" download="sampleB.wav">download</a>
+      <a
+        class="recorder_download"
+        href="#"
+        data-base="sampleA"
+        download="sampleB.wav"
+        >download</a
+      >
     </div>
     <p>
       <strong>Step 3</strong>:
