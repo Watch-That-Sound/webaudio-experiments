@@ -3,9 +3,11 @@
     <title>Watch That Sound Experiments - Live Loopback Delay</title>
     <script type="text/javascript">
       let audioCtx;
+      let streamSource;
       let analyser;
       let sine;
       let gain;
+      let worklet;
 
       let drawFrameId;
       let dataArray;
@@ -16,7 +18,13 @@
       let targetFrequencyBin;
       const CUTOFF = 180;
       const FFTSIZE = 128;
+      let volume = 0;
 
+      const handleWorkletMessage = (msg) => {
+        if (msg.volume) {
+          volume = msg.volume;
+        }
+      };
       async function setup() {
         audioCtx = new (AudioContext || webkitAudioContext)();
         canvasCtx = document.getElementById("canvas").getContext("2d");
@@ -44,7 +52,7 @@
         (sine.frequency.value = document.getElementById("frequency").value),
           sine.start();
 
-        const streamSource = audioCtx.createMediaStreamSource(stream);
+        streamSource = audioCtx.createMediaStreamSource(stream);
         analyser = audioCtx.createAnalyser();
         analyser.fftSize = FFTSIZE;
         analyser.smoothingTimeConstant = 0;
@@ -57,13 +65,30 @@
         streamSource.connect(analyser);
 
         drawFrameId = requestAnimationFrame(draw);
+
+        await audioCtx.audioWorklet.addModule("detector.js?" + Date.now());
+        worklet = new AudioWorkletNode(audioCtx, "detector");
+        worklet.onprocessorerror = (err) => {
+          console.error("worklet err", err);
+        };
+        worklet.port.onmessage = (e) => handleWorkletMessage(e.data);
+        streamSource.connect(worklet);
+
+        document.getElementById("ctx_latencies").innerText = `base: ${formatMs(
+          audioCtx.baseLatency
+        )} output: ${formatMs(audioCtx.outputLatency)}`;
       }
 
       function draw() {
         drawFrameId = requestAnimationFrame(draw);
+
         analyser.getByteFrequencyData(dataArray);
         canvasCtx.fillStyle = "rgb(0, 0, 0)";
         canvasCtx.fillRect(0, 0, WIDTH, HEIGHT);
+
+        const volumeHeight = (1 - volume) * HEIGHT;
+        canvasCtx.fillStyle = "rgb(0,255,0)";
+        canvasCtx.fillRect(0, volumeHeight, WIDTH, 2);
 
         var barWidth = (WIDTH / dataBufferLength) * 2.5;
         var barHeight;
@@ -141,25 +166,29 @@
         }
       }
 
-      function stopDrawingAnalyser() {
-        if (drawFrameId) {
-          cancelAnimationFrame(drawFrameId);
-          drawFrameId = undefined;
-        }
-        document.getElementById("ctx_latencies").innerText = `base: ${formatMs(
-          audioCtx.baseLatency
-        )} output: ${formatMs(audioCtx.outputLatency)}`;
-        canvasCtx.fillStyle = "rgb(255, 255, 255)";
-        canvasCtx.fillRect(0, 0, WIDTH, HEIGHT);
-      }
+      // function stopDrawingAnalyser() {
+      //   if (drawFrameId) {
+      //     cancelAnimationFrame(drawFrameId);
+      //     drawFrameId = undefined;
+      //   }
+      //   try {
+      //     streamSource.disconnect(analyser);
+      //   } catch (ex) {}
+      //   document.getElementById("ctx_latencies").innerText = `base: ${formatMs(
+      //     audioCtx.baseLatency
+      //   )} output: ${formatMs(audioCtx.outputLatency)}`;
+      //   canvasCtx.fillStyle = "rgb(255, 255, 255)";
+      //   canvasCtx.fillRect(0, 0, WIDTH, HEIGHT);
+      // }
 
       function measureAfterMute() {
-        stopDrawingAnalyser();
+        // stopDrawingAnalyser();
         setTimeout(() => {
+          worklet.port.postMessage({ detect: "mute" });
           // wait a moment for the cancelAnimationFrame to surely kick in, then mute and measure
-          detectMuteTimer = setInterval(detectMute, 0);
-          gain.gain.value = 0;
-          muteMeasurement.start = audioCtx.currentTime;
+          // detectMuteTimer = setInterval(detectMute, 0);
+          // gain.gain.value = 0;
+          // muteMeasurement.start = audioCtx.currentTime;
         }, 500);
       }
 
@@ -189,12 +218,10 @@
     </script>
   </head>
   <body>
-    <h1>Experiment 2: Live Loopback Delay</h1>
+    <h1>Experiment 3: Live Loopback Delay with AudioWorklet</h1>
     <p>
-      What is the delay when producing sound in WebAudio, until it is analysed?
-      Note that this example uses JS setInterval to do the measuring, which adds
-      uncertainty to the measurement. Working on an
-      <a href="./worklet.html">experiment with AudioWorklet</a>.
+      What is the delay when producing sound in WebAudio, until it is picked up
+      in an AudioWorklet?
     </p>
     <h2>Step 1: setup</h2>
     <p>
