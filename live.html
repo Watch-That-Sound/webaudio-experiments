@@ -114,9 +114,10 @@
         if (dataArray[targetFrequencyBin] === 0) {
           muteMeasurement.detect = audioCtx.currentTime;
           clearInterval(detectMuteTimer);
-          document.getElementById("measure_mute").innerText = formatMs(
-            muteMeasurement.detect - muteMeasurement.start
-          );
+          document.getElementById("measure_mute").innerText +=
+            " " +
+            formatMs(muteMeasurement.detect - muteMeasurement.start) +
+            " / ";
         } else {
           // loopy
         }
@@ -128,12 +129,13 @@
       };
       function detectUnmute() {
         analyser.getByteFrequencyData(dataArray);
-        if (dataArray[targetFrequencyBin] === 0) {
+        if (dataArray[targetFrequencyBin] > CUTOFF) {
           unmuteMeasurement.detect = audioCtx.currentTime;
           clearInterval(detectUnmuteTimer);
-          document.getElementById("measure_unmute").innerText = formatMs(
-            unmuteMeasurement.detect - unmuteMeasurement.start
-          );
+          document.getElementById("measure_unmute").innerText +=
+            " " +
+            formatMs(unmuteMeasurement.detect - unmuteMeasurement.start) +
+            " / ";
         } else {
           // loopy
         }
