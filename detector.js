@@ -15,7 +15,7 @@ class DetectorProcessor extends AudioWorkletProcessor {
     this.port.postMessage({ volume: rms });
     if (this.startTime) {
       if (this.detectMute) {
-        if (rms < 0.1) {
+        if (rms < 0.05) {
           console.log("found silence", sumSqr, rms);
           this.startTime = undefined;
         }
